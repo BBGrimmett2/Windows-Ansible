@@ -4,13 +4,13 @@
 
 Param (
     [string]$SubjectName = $env:COMPUTERNAME,
-    # [int]$CertValidityDays = 1095,
+    [int]$CertValidityDays = 1095,
     [switch]$SkipNetworkProfileCheck,
-    # $CreateSelfSignedCert = $true,
-    # [switch]$ForceNewSSLCert,
+    $CreateSelfSignedCert = $true,
+    [switch]$ForceNewSSLCert,
     [switch]$GlobalHttpFirewallAccess,
     [switch]$DisableBasicAuth = $false,
-    [switch]$EnableCredSSP
+    [switch]$EnableCredSSP = $true
 )
 
 # Function Write-ProgressLog {
@@ -240,12 +240,15 @@ if ($token_value -ne 1) {
     New-ItemProperty -Path $token_path -Name $token_prop_name -Value 1 -PropertyType DWORD > $null
 }
 
-# # Make sure there is a SSL listener.
+# Make sure there is a SSL listener.
 # $listeners = Get-ChildItem WSMan:\localhost\Listener
 # If (!($listeners | Where-Object { $_.Keys -like "TRANSPORT=HTTPS" })) {
 #     # We cannot use New-SelfSignedCertificate on 2012R2 and earlier
-#     $thumbprint = New-LegacySelfSignedCert -SubjectName $SubjectName -ValidDays $CertValidityDays
+#     $thumbprint = New-LegacySelfSignedCert -SubjectName $SubjectName 
 #     # Write-HostLog "Self-signed SSL certificate generated; thumbprint: $thumbprint"
+
+#         #  -ValidDays $CertValidityDays
+
 
 #     # Create the hashtables of settings to be used.
 #     $valueset = @{
@@ -328,40 +331,37 @@ If ($GlobalHttpFirewallAccess) {
     Enable-GlobalHttpFirewallAccess
 }
 
-# Configure firewall to allow WinRM HTTPS connections.
-$fwtest1 = netsh advfirewall firewall show rule name="Allow WinRM HTTPS"
-$fwtest2 = netsh advfirewall firewall show rule name="Allow WinRM HTTPS" profile=any
-If ($fwtest1.count -lt 5) {
-    Write-Verbose "Adding firewall rule to allow WinRM HTTPS."
-    netsh advfirewall firewall add rule profile=any name="Allow WinRM HTTPS" dir=in localport=5986 protocol=TCP action=allow
-    # Write-ProgressLog "Added firewall rule to allow WinRM HTTPS."
-}
-ElseIf (($fwtest1.count -ge 5) -and ($fwtest2.count -lt 5)) {
-    Write-Verbose "Updating firewall rule to allow WinRM HTTPS for any profile."
-    netsh advfirewall firewall set rule name="Allow WinRM HTTPS" new profile=any
-    # Write-ProgressLog "Updated firewall rule to allow WinRM HTTPS for any profile."
-}
-Else {
-    Write-Verbose "Firewall rule already exists to allow WinRM HTTPS."
-}
+# # Configure firewall to allow WinRM HTTPS connections.
+# $fwtest1 = netsh advfirewall firewall show rule name="Allow WinRM HTTPS"
+# $fwtest2 = netsh advfirewall firewall show rule name="Allow WinRM HTTPS" profile=any
+# If ($fwtest1.count -lt 5) {
+#     Write-Verbose "Adding firewall rule to allow WinRM HTTPS."
+#     netsh advfirewall firewall add rule profile=any name="Allow WinRM HTTPS" dir=in localport=5986 protocol=TCP action=allow
+#     # Write-ProgressLog "Added firewall rule to allow WinRM HTTPS."
+# }
+# ElseIf (($fwtest1.count -ge 5) -and ($fwtest2.count -lt 5)) {
+#     Write-Verbose "Updating firewall rule to allow WinRM HTTPS for any profile."
+#     netsh advfirewall firewall set rule name="Allow WinRM HTTPS" new profile=any
+#     # Write-ProgressLog "Updated firewall rule to allow WinRM HTTPS for any profile."
+# }
+# Else {
+#     Write-Verbose "Firewall rule already exists to allow WinRM HTTPS."
+# }
 
 # Test a remoting connection to localhost, which should work.
 $httpResult = Invoke-Command -ComputerName "localhost" -ScriptBlock { $using:env:COMPUTERNAME } -ErrorVariable httpError -ErrorAction SilentlyContinue
-$httpsOptions = New-PSSessionOption -SkipCACheck -SkipCNCheck -SkipRevocationCheck
+# $httpsOptions = New-PSSessionOption -SkipCACheck -SkipCNCheck -SkipRevocationCheck
 
-$httpsResult = New-PSSession -UseSSL -ComputerName "localhost" -SessionOption $httpsOptions -ErrorVariable httpsError -ErrorAction SilentlyContinue
+# $httpsResult = New-PSSession -UseSSL -ComputerName "localhost" -SessionOption $httpsOptions -ErrorVariable httpsError -ErrorAction SilentlyContinue
 
-If ($httpResult -and $httpsResult) {
-    Write-Verbose "HTTP: Enabled | HTTPS: Enabled"
+If ($httpResult) {
+    Write-Verbose "HTTP: Enabled"
 }
-ElseIf ($httpsResult -and !$httpResult) {
-    Write-Verbose "HTTP: Disabled | HTTPS: Enabled"
-}
-ElseIf ($httpResult -and !$httpsResult) {
-    Write-Verbose "HTTP: Enabled | HTTPS: Disabled"
+ElseIf (!$httpResult) {
+    Write-Verbose "HTTP: Disabled"
 }
 Else {
-    # Write-ProgressLog "Unable to establish an HTTP or HTTPS remoting session."
-    Throw "Unable to establish an HTTP or HTTPS remoting session."
+    # Write-ProgressLog "Unable to establish an HTTP remoting session."
+    Throw "Unable to establish an HTTP remoting session."
 }
 Write-VerboseLog "PS Remoting has been successfully configured for Ansible."
