@@ -1,0 +1,5 @@
+---
+- name: win_ping
+  hosts: all
+  tasks:
+    - ansible.builtin.win_ping:
