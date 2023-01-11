@@ -1,3 +1,4 @@
+# Adopted from https://github.com/ansible/ansible/blob/devel/examples/scripts/ConfigureRemotingForAnsible.ps1
 #Requires -Version 3.0
 
 [CmdletBinding()]
@@ -18,9 +19,9 @@ Param (
 #     Write-EventLog -LogName Application -Source $EventSource -EntryType Information -EventId 1 -Message $Message
 # }
 
-Function Write-VerboseLog {
+Function Write-OutputLog {
     $Message = $args[0]
-    Write-Verbose $Message
+    Write-Output $Message
     # Write-ProgressLog $Message
 }
 
@@ -105,8 +106,7 @@ Function Write-VerboseLog {
 # }
 
 Function Enable-GlobalHttpFirewallAccess {
-    Write-Verbose "Forcing global HTTP firewall access"
-    # this is a fairly naive implementation; could be more sophisticated about rule matching/collapsing
+    Write-Output "Forcing global HTTP firewall access"
     $fw = New-Object -ComObject HNetCfg.FWPolicy2
 
     # try to find/enable the default rule first
@@ -115,16 +115,16 @@ Function Enable-GlobalHttpFirewallAccess {
     $rule = $null
     If ($matching_rules) {
         If ($matching_rules -isnot [Array]) {
-            Write-Verbose "Editing existing single HTTP firewall rule"
+            Write-Output "Editing existing single HTTP firewall rule"
             $rule = $matching_rules
         }
         Else {
             # try to find one with the All or Public profile first
-            Write-Verbose "Found multiple existing HTTP firewall rules..."
+            Write-Output "Found multiple existing HTTP firewall rules..."
             $rule = $matching_rules | ForEach-Object { $_.Profiles -band 4 }[0]
 
             If (-not $rule -or $rule -is [Array]) {
-                Write-Verbose "Editing an arbitrary single HTTP firewall rule (multiple existed)"
+                Write-Output "Editing an arbitrary single HTTP firewall rule (multiple existed)"
                 # oh well, just pick the first one
                 $rule = $matching_rules[0]
             }
@@ -132,7 +132,7 @@ Function Enable-GlobalHttpFirewallAccess {
     }
 
     If (-not $rule) {
-        Write-Verbose "Creating a new HTTP firewall rule"
+        Write-Output "Creating a new HTTP firewall rule"
         $rule = New-Object -ComObject HNetCfg.FWRule
         $rule.Name = "Windows Remote Management (HTTP-In)"
         $rule.Description = "Inbound rule for Windows Remote Management via WS-Management. [TCP 5985]"
@@ -154,7 +154,7 @@ Function Enable-GlobalHttpFirewallAccess {
         $fw.Rules.Add($rule)
     }
 
-    Write-Verbose "HTTP firewall rule $($rule.Name) updated"
+    Write-Output "HTTP firewall rule $($rule.Name) updated"
 }
 
 # Setup error handling.
@@ -194,16 +194,16 @@ If ($PSVersionTable.PSVersion.Major -lt 3) {
 }
 
 # Find and start the WinRM service.
-Write-Verbose "Verifying WinRM service."
+Write-Output "Verifying WinRM service."
 If (!(Get-Service "WinRM")) {
     # Write-ProgressLog "Unable to find the WinRM service."
     Throw "Unable to find the WinRM service."
 }
 ElseIf ((Get-Service "WinRM").Status -ne "Running") {
-    Write-Verbose "Setting WinRM service to start automatically on boot."
+    Write-Output "Setting WinRM service to start automatically on boot."
     Set-Service -Name "WinRM" -StartupType Automatic
     # Write-ProgressLog "Set WinRM service to start automatically on boot."
-    Write-Verbose "Starting WinRM service."
+    Write-Output "Starting WinRM service."
     Start-Service -Name "WinRM" -ErrorAction Stop
     # Write-ProgressLog "Started WinRM service."
 
@@ -212,18 +212,18 @@ ElseIf ((Get-Service "WinRM").Status -ne "Running") {
 # WinRM should be running; check that we have a PS session config.
 If (!(Get-PSSessionConfiguration -Verbose:$false) -or (!(Get-ChildItem WSMan:\localhost\Listener))) {
     If ($SkipNetworkProfileCheck) {
-        Write-Verbose "Enabling PS Remoting without checking Network profile."
+        Write-Output "Enabling PS Remoting without checking Network profile."
         Enable-PSRemoting -SkipNetworkProfileCheck -Force -ErrorAction Stop
         # Write-ProgressLog "Enabled PS Remoting without checking Network profile."
     }
     Else {
-        Write-Verbose "Enabling PS Remoting."
+        Write-Output "Enabling PS Remoting."
         Enable-PSRemoting -Force -ErrorAction Stop
         # Write-ProgressLog "Enabled PS Remoting."
     }
 }
 Else {
-    Write-Verbose "PS Remoting is already enabled."
+    Write-Output "PS Remoting is already enabled."
 }
 
 # Ensure LocalAccountTokenFilterPolicy is set to 1
@@ -233,7 +233,7 @@ $token_prop_name = "LocalAccountTokenFilterPolicy"
 $token_key = Get-Item -Path $token_path
 $token_value = $token_key.GetValue($token_prop_name, $null)
 if ($token_value -ne 1) {
-    Write-Verbose "Setting LocalAccountTOkenFilterPolicy to 1"
+    Write-Output "Setting LocalAccountTOkenFilterPolicy to 1"
     if ($null -ne $token_value) {
         Remove-ItemProperty -Path $token_path -Name $token_prop_name
     }
@@ -261,12 +261,12 @@ if ($token_value -ne 1) {
 #         Address = "*"
 #     }
 
-#     Write-Verbose "Enabling SSL listener."
+#     Write-Output "Enabling SSL listener."
 #     New-WSManInstance -ResourceURI 'winrm/config/Listener' -SelectorSet $selectorset -ValueSet $valueset
 #     # Write-ProgressLog "Enabled SSL listener."
 # }
 # Else {
-#     Write-Verbose "SSL listener is already active."
+#     Write-Output "SSL listener is already active."
 
 #     # Force a new SSL cert on Listener if the $ForceNewSSLCert
 #     If ($ForceNewSSLCert) {
@@ -297,31 +297,33 @@ $basicAuthSetting = Get-ChildItem WSMan:\localhost\Service\Auth | Where-Object {
 
 If ($DisableBasicAuth) {
     If (($basicAuthSetting.Value) -eq $true) {
-        Write-Verbose "Disabling basic auth support."
+        Write-Output "Disabling basic auth support."
         Set-Item -Path "WSMan:\localhost\Service\Auth\Basic" -Value $false
         # Write-ProgressLog "Disabled basic auth support."
     }
     Else {
-        Write-Verbose "Basic auth is already disabled."
+        Write-Output "Basic auth is already disabled."
     }
 }
 Else {
     If (($basicAuthSetting.Value) -eq $false) {
-        Write-Verbose "Enabling basic auth support."
+        Write-Output "Enabling basic auth support."
         Set-Item -Path "WSMan:\localhost\Service\Auth\Basic" -Value $true
         # Write-ProgressLog "Enabled basic auth support."
     }
     Else {
-        Write-Verbose "Basic auth is already enabled."
+        Write-Output "Basic auth is already enabled."
     }
 }
+
+
 
 # If EnableCredSSP if set to true
 If ($EnableCredSSP) {
     # Check for CredSSP authentication
     $credsspAuthSetting = Get-ChildItem WSMan:\localhost\Service\Auth | Where-Object { $_.Name -eq "CredSSP" }
     If (($credsspAuthSetting.Value) -eq $false) {
-        Write-Verbose "Enabling CredSSP auth support."
+        Write-Output "Enabling CredSSP auth support."
         Enable-WSManCredSSP -role server -Force
         # Write-ProgressLog "Enabled CredSSP auth support."
     }
@@ -335,17 +337,17 @@ If ($GlobalHttpFirewallAccess) {
 # $fwtest1 = netsh advfirewall firewall show rule name="Allow WinRM HTTPS"
 # $fwtest2 = netsh advfirewall firewall show rule name="Allow WinRM HTTPS" profile=any
 # If ($fwtest1.count -lt 5) {
-#     Write-Verbose "Adding firewall rule to allow WinRM HTTPS."
+#     Write-Output "Adding firewall rule to allow WinRM HTTPS."
 #     netsh advfirewall firewall add rule profile=any name="Allow WinRM HTTPS" dir=in localport=5986 protocol=TCP action=allow
 #     # Write-ProgressLog "Added firewall rule to allow WinRM HTTPS."
 # }
 # ElseIf (($fwtest1.count -ge 5) -and ($fwtest2.count -lt 5)) {
-#     Write-Verbose "Updating firewall rule to allow WinRM HTTPS for any profile."
+#     Write-Output "Updating firewall rule to allow WinRM HTTPS for any profile."
 #     netsh advfirewall firewall set rule name="Allow WinRM HTTPS" new profile=any
 #     # Write-ProgressLog "Updated firewall rule to allow WinRM HTTPS for any profile."
 # }
 # Else {
-#     Write-Verbose "Firewall rule already exists to allow WinRM HTTPS."
+#     Write-Output "Firewall rule already exists to allow WinRM HTTPS."
 # }
 
 # Test a remoting connection to localhost, which should work.
@@ -355,13 +357,13 @@ $httpResult = Invoke-Command -ComputerName "localhost" -ScriptBlock { $using:env
 # $httpsResult = New-PSSession -UseSSL -ComputerName "localhost" -SessionOption $httpsOptions -ErrorVariable httpsError -ErrorAction SilentlyContinue
 
 If ($httpResult) {
-    Write-Verbose "HTTP: Enabled"
+    Write-Output "HTTP: Enabled"
 }
 ElseIf (!$httpResult) {
-    Write-Verbose "HTTP: Disabled"
+    Write-Output "HTTP: Disabled"
 }
 Else {
     # Write-ProgressLog "Unable to establish an HTTP remoting session."
     Throw "Unable to establish an HTTP remoting session."
 }
-Write-VerboseLog "PS Remoting has been successfully configured for Ansible."
+Write-OutputLog "PS Remoting has been successfully configured for Ansible."
