@@ -241,56 +241,56 @@ if ($token_value -ne 1) {
 }
 
 # Make sure there is a SSL listener.
-# $listeners = Get-ChildItem WSMan:\localhost\Listener
-# If (!($listeners | Where-Object { $_.Keys -like "TRANSPORT=HTTPS" })) {
-#     # We cannot use New-SelfSignedCertificate on 2012R2 and earlier
-#     $thumbprint = New-LegacySelfSignedCert -SubjectName $SubjectName 
-#     # Write-HostLog "Self-signed SSL certificate generated; thumbprint: $thumbprint"
+$listeners = Get-ChildItem WSMan:\localhost\Listener
+If (!($listeners | Where-Object { $_.Keys -like "TRANSPORT=HTTPS" })) {
+    # We cannot use New-SelfSignedCertificate on 2012R2 and earlier
+    $thumbprint = New-LegacySelfSignedCert -SubjectName $SubjectName 
+    # Write-HostLog "Self-signed SSL certificate generated; thumbprint: $thumbprint"
 
-#         #  -ValidDays $CertValidityDays
+        #  -ValidDays $CertValidityDays
 
 
-#     # Create the hashtables of settings to be used.
-#     $valueset = @{
-#         Hostname = $SubjectName
-#         CertificateThumbprint = $thumbprint
-#     }
+    # Create the hashtables of settings to be used.
+    $valueset = @{
+        Hostname = $SubjectName
+        CertificateThumbprint = $thumbprint
+    }
 
-#     $selectorset = @{
-#         Transport = "HTTPS"
-#         Address = "*"
-#     }
+    $selectorset = @{
+        Transport = "HTTPS"
+        Address = "*"
+    }
 
-#     Write-Output "Enabling SSL listener."
-#     New-WSManInstance -ResourceURI 'winrm/config/Listener' -SelectorSet $selectorset -ValueSet $valueset
-#     # Write-ProgressLog "Enabled SSL listener."
-# }
-# Else {
-#     Write-Output "SSL listener is already active."
+    Write-Output "Enabling SSL listener."
+    New-WSManInstance -ResourceURI 'winrm/config/Listener' -SelectorSet $selectorset -ValueSet $valueset
+    # Write-ProgressLog "Enabled SSL listener."
+}
+Else {
+    Write-Output "SSL listener is already active."
 
-#     # Force a new SSL cert on Listener if the $ForceNewSSLCert
-#     If ($ForceNewSSLCert) {
+    # Force a new SSL cert on Listener if the $ForceNewSSLCert
+    If ($ForceNewSSLCert) {
 
-#         # We cannot use New-SelfSignedCertificate on 2012R2 and earlier
-#         $thumbprint = New-LegacySelfSignedCert -SubjectName $SubjectName -ValidDays $CertValidityDays
-#         # Write-HostLog "Self-signed SSL certificate generated; thumbprint: $thumbprint"
+        # We cannot use New-SelfSignedCertificate on 2012R2 and earlier
+        $thumbprint = New-LegacySelfSignedCert -SubjectName $SubjectName -ValidDays $CertValidityDays
+        # Write-HostLog "Self-signed SSL certificate generated; thumbprint: $thumbprint"
 
-#         $valueset = @{
-#             CertificateThumbprint = $thumbprint
-#             Hostname = $SubjectName
-#         }
+        $valueset = @{
+            CertificateThumbprint = $thumbprint
+            Hostname = $SubjectName
+        }
 
-#         # Delete the listener for SSL
-#         $selectorset = @{
-#             Address = "*"
-#             Transport = "HTTPS"
-#         }
-#         Remove-WSManInstance -ResourceURI 'winrm/config/Listener' -SelectorSet $selectorset
+        # Delete the listener for SSL
+        $selectorset = @{
+            Address = "*"
+            Transport = "HTTPS"
+        }
+        Remove-WSManInstance -ResourceURI 'winrm/config/Listener' -SelectorSet $selectorset
 
-#         # Add new Listener with new SSL cert
-#         New-WSManInstance -ResourceURI 'winrm/config/Listener' -SelectorSet $selectorset -ValueSet $valueset
-#     }
-# }
+        # Add new Listener with new SSL cert
+        New-WSManInstance -ResourceURI 'winrm/config/Listener' -SelectorSet $selectorset -ValueSet $valueset
+    }
+}
 
 # Check for basic authentication.
 $basicAuthSetting = Get-ChildItem WSMan:\localhost\Service\Auth | Where-Object { $_.Name -eq "Basic" }
@@ -333,28 +333,28 @@ If ($GlobalHttpFirewallAccess) {
     Enable-GlobalHttpFirewallAccess
 }
 
-# # Configure firewall to allow WinRM HTTPS connections.
-# $fwtest1 = netsh advfirewall firewall show rule name="Allow WinRM HTTPS"
-# $fwtest2 = netsh advfirewall firewall show rule name="Allow WinRM HTTPS" profile=any
-# If ($fwtest1.count -lt 5) {
-#     Write-Output "Adding firewall rule to allow WinRM HTTPS."
-#     netsh advfirewall firewall add rule profile=any name="Allow WinRM HTTPS" dir=in localport=5986 protocol=TCP action=allow
-#     # Write-ProgressLog "Added firewall rule to allow WinRM HTTPS."
-# }
-# ElseIf (($fwtest1.count -ge 5) -and ($fwtest2.count -lt 5)) {
-#     Write-Output "Updating firewall rule to allow WinRM HTTPS for any profile."
-#     netsh advfirewall firewall set rule name="Allow WinRM HTTPS" new profile=any
-#     # Write-ProgressLog "Updated firewall rule to allow WinRM HTTPS for any profile."
-# }
-# Else {
-#     Write-Output "Firewall rule already exists to allow WinRM HTTPS."
-# }
+# Configure firewall to allow WinRM HTTPS connections.
+$fwtest1 = netsh advfirewall firewall show rule name="Allow WinRM HTTPS"
+$fwtest2 = netsh advfirewall firewall show rule name="Allow WinRM HTTPS" profile=any
+If ($fwtest1.count -lt 5) {
+    Write-Output "Adding firewall rule to allow WinRM HTTPS."
+    netsh advfirewall firewall add rule profile=any name="Allow WinRM HTTPS" dir=in localport=5986 protocol=TCP action=allow
+    # Write-ProgressLog "Added firewall rule to allow WinRM HTTPS."
+}
+ElseIf (($fwtest1.count -ge 5) -and ($fwtest2.count -lt 5)) {
+    Write-Output "Updating firewall rule to allow WinRM HTTPS for any profile."
+    netsh advfirewall firewall set rule name="Allow WinRM HTTPS" new profile=any
+    # Write-ProgressLog "Updated firewall rule to allow WinRM HTTPS for any profile."
+}
+Else {
+    Write-Output "Firewall rule already exists to allow WinRM HTTPS."
+}
 
 # Test a remoting connection to localhost, which should work.
 $httpResult = Invoke-Command -ComputerName "localhost" -ScriptBlock { $using:env:COMPUTERNAME } -ErrorVariable httpError -ErrorAction SilentlyContinue
-# $httpsOptions = New-PSSessionOption -SkipCACheck -SkipCNCheck -SkipRevocationCheck
+$httpsOptions = New-PSSessionOption -SkipCACheck -SkipCNCheck -SkipRevocationCheck
 
-# $httpsResult = New-PSSession -UseSSL -ComputerName "localhost" -SessionOption $httpsOptions -ErrorVariable httpsError -ErrorAction SilentlyContinue
+$httpsResult = New-PSSession -UseSSL -ComputerName "localhost" -SessionOption $httpsOptions -ErrorVariable httpsError -ErrorAction SilentlyContinue
 
 If ($httpResult) {
     Write-Output "HTTP: Enabled"
