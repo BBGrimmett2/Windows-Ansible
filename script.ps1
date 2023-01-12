@@ -326,15 +326,18 @@ $httpsOptions = New-PSSessionOption -SkipCACheck -SkipCNCheck -SkipRevocationChe
 
 $httpsResult = New-PSSession -UseSSL -ComputerName "localhost" -SessionOption $httpsOptions -ErrorVariable httpsError -ErrorAction SilentlyContinue
 
-If ($httpResult) {
-    Write-Output "HTTP: Enabled"
+If ($httpResult -and $httpsResult) {
+    Write-Verbose "HTTP: Enabled | HTTPS: Enabled"
 }
-ElseIf (!$httpResult) {
-    Write-Output "HTTP: Disabled"
+ElseIf ($httpsResult -and !$httpResult) {
+    Write-Verbose "HTTP: Disabled | HTTPS: Enabled"
+}
+ElseIf ($httpResult -and !$httpsResult) {
+    Write-Verbose "HTTP: Enabled | HTTPS: Disabled"
 }
 Else {
-    # Write-ProgressLog "Unable to establish an HTTP remoting session."
-    Throw "Unable to establish an HTTP remoting session."
+    Write-ProgressLog "Unable to establish an HTTP or HTTPS remoting session."
+    Throw "Unable to establish an HTTP or HTTPS remoting session."
 }
 
 # Confirmation ---------------------------------------------------------------------------------------------
